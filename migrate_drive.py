@@ -70,48 +70,50 @@ def migrate_folders_and_files(source_service, dest_service):
                     item_id = item['id']
                     item_mime_type = item['mimeType']
 
-                    # Als het item een map is
-                    if item_mime_type == 'application/vnd.google-apps.folder':
-                        print(f"  📂 Map gevonden: {item_name}")
-                        folder_metadata = {
-                            'name': item_name,
-                            'mimeType': 'application/vnd.google-apps.folder',
-                            'parents': [dest_parent_id]
-                        }
+                    try:
+                        # Als het item een map is
+                        if item_mime_type == 'application/vnd.google-apps.folder':
+                            print(f"  📂 Map gevonden: {item_name}")
+                            folder_metadata = {
+                                'name': item_name,
+                                'mimeType': 'application/vnd.google-apps.folder',
+                                'parents': [dest_parent_id]
+                            }
 
-                        # Maak de map aan in de doel-drive
-                        created_folder = dest_service.files().create(body=folder_metadata, fields='id').execute()
-                        new_folder_id = created_folder.get('id')
-                        print(f"    ✅ Map '{item_name}' aangemaakt in doel-drive.")
+                            created_folder = dest_service.files().create(body=folder_metadata, fields='id').execute()
+                            new_folder_id = created_folder.get('id')
+                            print(f"    ✅ Map '{item_name}' aangemaakt in doel-drive.")
 
-                        # Sla de mapping op en ga recursief verder
-                        folder_map[item_id] = new_folder_id
-                        recursively_copy(item_id, new_folder_id)
+                            folder_map[item_id] = new_folder_id
+                            recursively_copy(item_id, new_folder_id)
 
-                    # Als het item een bestand is
-                    else:
-                        print(f"  📄 Bestand gevonden: {item_name}")
-                        file_metadata = {
-                            'name': item_name,
-                            'parents': [dest_parent_id]
-                        }
+                        # Als het item een bestand is
+                        else:
+                            print(f"  📄 Bestand gevonden: {item_name}")
+                            file_metadata = {
+                                'name': item_name,
+                                'parents': [dest_parent_id]
+                            }
 
-                        # Kopieer het bestand naar de doel-drive
-                        dest_service.files().copy(
-                            fileId=item_id,
-                            body=file_metadata,
-                            fields='id'
-                        ).execute()
-                        print(f"    ✅ Bestand '{item_name}' gekopieerd.")
+                            # Kopieer het bestand. Gebruik source_service, want alleen die kent de item_id.
+                            source_service.files().copy(
+                                fileId=item_id,
+                                body=file_metadata,
+                                fields='id'
+                            ).execute()
+                            print(f"    ✅ Bestand '{item_name}' gekopieerd.")
+
+                    except Exception as e:
+                        print(f"    ❌ FOUT bij verwerken van '{item_name}' (ID: {item_id}). Dit item wordt overgeslagen. Fout: {e}")
+                        continue # Ga door met het volgende item in de for-loop
 
                 page_token = results.get('nextPageToken', None)
                 if not page_token:
                     break
 
             except Exception as e:
-                print(f" Fout opgetreden: {e}")
-                print("   Opnieuw proberen...")
-                continue
+                print(f"    ❌ KRITISCHE FOUT bij ophalen van bestandenlijst. Kan niet doorgaan met deze map. Fout: {e}")
+                break # Breek de while-loop af voor deze map
 
     print("\n▶️  Start van de migratie. Dit kan enige tijd duren, afhankelijk van de hoeveelheid data.")
     # Start het proces vanaf de root-map
