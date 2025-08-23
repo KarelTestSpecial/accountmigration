@@ -2,9 +2,21 @@
 
 Deze tool is ontworpen om de volledige inhoud (mappen en bestanden) van het ene Google Drive-account naar het andere te migreren, met behoud van de oorspronkelijke mappenstructuur.
 
+## Hoe het werkt
+
+De tool volgt een robuust, permissie-veilig proces dat de standaardmethode voor Drive-migraties nabootst:
+1.  **Mappenstructuur Kopiëren:** De tool maakt eerst een spiegel van de mappenstructuur van het bronaccount in het doelaccount.
+2.  **Bestanden Migreren (Share-Copy-Move):** Voor elk bestand wordt een veilig, vierstaps proces gevolgd:
+    a. Het bronaccount **deelt** het bestand tijdelijk met het doelaccount.
+    b. Het doelaccount **maakt een kopie** van het gedeelde bestand. Deze kopie is nu eigendom van het doelaccount.
+    c. De kopie wordt **verplaatst** naar de juiste map in de nieuwe mappenstructuur.
+    d. De tijdelijke deelpermissie op het bronbestand wordt weer **opgeschoond**.
+
+Dit proces zorgt ervoor dat bestanden correct worden overgedragen, zelfs als ze complexere permissies hebben of eigendom zijn van anderen.
+
 ## Waarschuwing
 
-Deze tool kopieert bestanden en mappen. Het synchroniseert geen wijzigingen en verwijdert niets uit het bron- of doelaccount. Gebruik op eigen risico.
+Deze tool kopieert bestanden en mappen. Het synchroniseert geen wijzigingen en verwijdert niets uit het bron- of doelaccount (buiten de tijdelijke deelpermissies die automatisch worden opgeschoond). Gebruik op eigen risico.
 
 ## Vereisten
 
