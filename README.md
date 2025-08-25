@@ -82,3 +82,33 @@ python migrate_drive.py
 ```
 
 De tool zal u eerst vragen om in te loggen op het **bronaccount** (het account waarvan u wilt kopiëren) en vervolgens op het **doelaccount** (het account waarnaar u wilt kopiëren). Volg de instructies in de terminal. Er wordt een browservenster geopend waarin u toestemming moet geven.
+
+---
+
+# Google Gmail Migratie Tool
+
+Deze tool is ontworpen om alle e-mails van het ene Gmail-account naar het andere te verhuizen. Het behoudt de originele e-mailinhoud, inclusief headers, body en bijlagen.
+
+## Hoe het werkt
+
+1.  **Authenticatie:** De tool vraagt u om in te loggen op zowel het bron- als het doelaccount via de veilige OAuth 2.0-methode van Google.
+2.  **Lijst van E-mails:** Het haalt een volledige lijst op van alle e-mails in het bronaccount.
+3.  **Migratie per E-mail:** Voor elke e-mail wordt de volledige, ongewijzigde data (`raw` format) opgehaald en vervolgens direct in het doelaccount ingevoegd. Dit zorgt voor een exacte kopie.
+
+## Vereisten
+
+De vereisten zijn hetzelfde als voor de Drive-migratietool. Zorg ervoor dat u de stappen in "Stap 1: Verkrijg `credentials.json` van Google" heeft voltooid. U moet ook de **Gmail API** inschakelen voor uw project.
+
+1.  **Schakel de Gmail API in:**
+    *   Ga naar de Google Cloud Console en selecteer uw project.
+    *   Ga naar **"API's en services"** > **"Bibliotheek"**.
+    *   Zoek naar **"Gmail API"** en klik erop.
+    *   Klik op de knop **"INSCHAKELEN"**.
+
+## Voer de Gmail-migratietool uit
+
+```bash
+python migrate_gmail.py
+```
+
+De tool zal u, net als de Drive-tool, vragen om in te loggen op het **bronaccount** en daarna op het **doelaccount**. Volg de instructies in de terminal.
