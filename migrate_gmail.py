@@ -46,11 +46,58 @@ def get_gmail_service(token_file):
 
     return build('gmail', 'v1', credentials=creds)
 
-def migrate_emails(source_service, dest_service):
+def migrate_labels(source_service, dest_service):
+    """
+    Migrates all user-created labels from the source to the destination account.
+    Returns a dictionary mapping source label IDs to destination label IDs.
+    """
+    print("\n▶️  Starting label migration...")
+    label_map = {}
+
+    try:
+        # Get all labels from the source account
+        source_labels = source_service.users().labels().list(userId='me').execute().get('labels', [])
+
+        # Get all existing labels from the destination account to avoid duplicates
+        dest_labels_raw = dest_service.users().labels().list(userId='me').execute().get('labels', [])
+        dest_label_names = {label['name']: label['id'] for label in dest_labels_raw}
+
+        for label in source_labels:
+            # We only migrate user-created labels. System labels are skipped.
+            if label['type'] == 'user':
+                label_name = label['name']
+                print(f"  - Found user label: '{label_name}'")
+
+                # Check if a label with the same name already exists in the destination
+                if label_name in dest_label_names:
+                    print(f"    Label '{label_name}' already exists in destination. Using existing label.")
+                    label_map[label['id']] = dest_label_names[label_name]
+                    continue
+
+                # If it doesn't exist, create it
+                try:
+                    new_label = {'name': label_name, 'labelListVisibility': 'labelShow', 'messageListVisibility': 'show'}
+                    created_label = dest_service.users().labels().create(userId='me', body=new_label).execute()
+                    label_map[label['id']] = created_label['id']
+                    print(f"    ✅ Label '{label_name}' created in destination account.")
+                except HttpError as error:
+                    print(f"    ❌ FOUT: Could not create label '{label_name}'. Error: {error}")
+
+        print("  Label migration finished.")
+        return label_map
+
+    except HttpError as error:
+        print(f"❌ CRITICAL ERROR: Could not retrieve label list from source account. {error}")
+        return {} # Return an empty map in case of a critical error
+
+def migrate_emails(source_service, dest_service, label_map=None):
     """
     The core function that migrates emails from the source to the destination account.
-    It fetches all emails from the source and inserts them into the destination.
+    If a label_map is provided, it applies the corresponding new labels to the migrated emails.
     """
+    if label_map is None:
+        label_map = {}
+
     try:
         # 1. Get the list of all message IDs from the source account
         print("\n▶️  Fetching list of all emails from the source account. This may take a moment...")
@@ -72,18 +119,34 @@ def migrate_emails(source_service, dest_service):
             print(f"\n  Migrating email {i + 1} of {total_emails} (ID: {msg_id})")
 
             try:
-                # Get the raw email content, which includes headers, body, and attachments
-                print("    1/2: Fetching raw email data...")
+                # Get the raw email content and its labels
+                print("    1/2: Fetching raw email data and labels...")
                 message = source_service.users().messages().get(userId='me', id=msg_id, format='raw').execute()
+                source_label_ids = message.get('labelIds', [])
 
-                # The raw data is base64url encoded, which is what the insert method requires
-                raw_email_data = {'raw': message['raw']}
+                # Prepare the message for insertion
+                new_label_ids = []
+                if source_label_ids:
+                    # Translate old labels to new labels using the map
+                    for label_id in source_label_ids:
+                        if label_id in label_map:
+                            new_label_ids.append(label_map[label_id])
+                        # Preserve important system labels that are not user-created
+                        elif label_id in ['UNREAD', 'STARRED', 'IMPORTANT']:
+                            new_label_ids.append(label_id)
+
+                # Ensure the email appears in the inbox if it was in the source inbox
+                if 'INBOX' in source_label_ids:
+                    new_label_ids.append('INBOX')
+
+                body = {
+                    'raw': message['raw'],
+                    'labelIds': list(set(new_label_ids)) # Use set to avoid duplicate labels
+                }
 
                 # Insert the email into the destination account
                 print("    2/2: Inserting email into destination account...")
-                dest_service.users().messages().insert(userId='me', body=raw_email_data).execute()
-
-                # Optional: You could add 'labelIds': ['INBOX'] to the body if you want to ensure it lands in the inbox
+                dest_service.users().messages().insert(userId='me', body=body).execute()
 
                 print(f"    ✅ Email {i + 1} migrated successfully.")
 
@@ -116,7 +179,16 @@ if __name__ == '__main__':
 
     print("\nAuthentication complete. Preparing the migration...")
 
-    # Start the migration
-    migrate_emails(source_gmail_service, dest_gmail_service)
+    # Ask the user if they want to migrate labels
+    migrate_labels_choice = input("\nDo you want to migrate the folder structure (labels)? (yes/no): ").lower().strip()
+
+    label_map = {}
+    if migrate_labels_choice == 'yes':
+        label_map = migrate_labels(source_gmail_service, dest_gmail_service)
+    else:
+        print("\nSkipping label migration as requested.")
+
+    # Start the email migration
+    migrate_emails(source_gmail_service, dest_gmail_service, label_map)
 
     print("\n🎉 Migration complete!")
